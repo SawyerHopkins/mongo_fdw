@@ -25,6 +25,7 @@
 #include "catalog/heap.h"
 #include "catalog/pg_operator.h"
 #include "catalog/pg_type.h"
+#include "utils/geo_decls.h"
 #if PG_VERSION_NUM >= 130000
 #include "common/hashfn.h"
 #include "common/jsonapi.h"
@@ -2042,7 +2043,7 @@ fill_tuple_slot(const BSON *bsonDocument, const char *bsonDocumentKey,
 		/* Recurse into nested objects */
 		if (bsonType == BSON_TYPE_DOCUMENT)
 		{
-			if (columnTypeId != JSONOID)
+			if (columnTypeId != JSONOID && columnTypeId != POINTOID)
 			{
 				BSON		subObject;
 
@@ -2163,6 +2164,10 @@ column_types_compatible(BSON_TYPE bsonType, Oid columnTypeId)
 		case JSONOID:
 			if (bsonType == BSON_TYPE_DOCUMENT ||
 				bsonType == BSON_TYPE_ARRAY)
+				compatibleTypes = true;
+			break;
+		case POINTOID:
+			if (bsonType == BSON_TYPE_DOCUMENT)
 				compatibleTypes = true;
 			break;
 		default:
@@ -2431,6 +2436,57 @@ column_value(BSON_ITERATOR *bsonIterator, Oid columnTypeId,
 				lex = makeJsonLexContext(result, false);
 				pg_parse_json(lex, &nullSemAction);
 				columnValue = PointerGetDatum(result);
+			}
+			break;
+		case POINTOID:
+			{
+				BSON pointBson;
+				BSON_ITERATOR pointBsonIterator = {NULL, 0};
+				BSON_ITERATOR coordinatesBsonIterator = {NULL, 0};
+				Point point;
+				int pointIndex = 0;
+
+				// Create sub iterator for geo document
+				bsonIterSubObject(bsonIterator, &pointBson);
+				if (bsonIterInit(&pointBsonIterator, &pointBson) == false)
+					elog(ERROR, "failed to initialize BSON iterator");
+
+				// Search for coordinates in object
+				while (bsonIterNext(&pointBsonIterator))
+				{
+					const char *pointKey = bsonIterKey(&pointBsonIterator);
+					BSON_TYPE	pointType = bsonIterType(&pointBsonIterator);
+
+					// Skip anything that isnt the coordinates array
+					if (strcmp(pointKey, "coordinates") != 0) {
+						continue;
+					}
+
+					// Get iterator for coordinates and ensure correct type
+					if (pointType != BSON_TYPE_ARRAY) {
+						elog(ERROR, "Expected coordinates to be of type array");
+					}
+					if (bsonIterSubIter(&pointBsonIterator, &coordinatesBsonIterator) == false)
+						elog(ERROR, "failed to initialize BSON array iterator");
+				}
+
+				// Convert array to point object
+				while (bsonIterNext(&coordinatesBsonIterator)) {
+					float8 coordinate = bsonIterDouble(&coordinatesBsonIterator);
+					if (pointIndex == 0) {
+						point.x = coordinate;
+					} else if (pointIndex == 1) {
+						point.y = coordinate;
+					}
+					pointIndex++;
+				}
+
+				// Set the column value if we have the expected number of elements in the array
+				if (pointIndex == 2) {
+					columnValue = PointPGetDatum(&point);
+				} else {
+					elog(ERROR, "Coordinates array contains more than two elements.");
+				}
 			}
 			break;
 		default:
