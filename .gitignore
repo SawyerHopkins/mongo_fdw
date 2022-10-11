@@ -7,6 +7,7 @@
 *.ko
 *.obj
 *.elf
+*.bc
 
 # Libraries
 *.lib
@@ -27,5 +28,8 @@
 
 # pgregress results directory
 results/
+regression.*
 
 .idea/
+json-c
+config.h

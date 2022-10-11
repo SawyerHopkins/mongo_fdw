@@ -1,0 +1,60 @@
+// For format details, see https://aka.ms/devcontainer.json. For config options, see the README at:
+// https://github.com/microsoft/vscode-dev-containers/tree/v0.245.2/containers/cpp
+{
+	"name": "C++",
+	"build": {
+		"dockerfile": "Dockerfile",
+		// Update 'VARIANT' to pick an Debian / Ubuntu OS version: debian-11, debian-10, ubuntu-22.04, ubuntu-20.04, ubuntu-18.04
+		// Use Debian 11, Ubuntu 18.04 or Ubuntu 22.04 on local arm64/Apple Silicon
+		"args": {
+			"VARIANT": "debian-11"
+		}
+	},
+	"runArgs": ["--cap-add=SYS_PTRACE", "--security-opt", "seccomp=unconfined"],
+
+	// Configure tool-specific properties.
+	"customizations": {
+		// Configure properties specific to VS Code.
+		"vscode": {
+			// Add the IDs of extensions you want installed when the container is created.
+			"extensions": [
+				"ms-vscode.cpptools",
+				"ms-vscode.cmake-tools"
+			]
+		}
+	},
+
+	// Use 'forwardPorts' to make a list of ports inside the container available locally.
+	"forwardPorts": [
+		5432
+	],
+
+	// The portsAttributes and otherPortsAttributes properties allow you to map default 
+	// port options for one or more manually or automatically forwarded ports. The following 
+	// is a list of options that can be set in the configuration object assigned to the property.
+	"portsAttributes": {
+		"5432": {
+			"label": "PostgreSQL",
+			"onAutoForward": "notify"
+		}
+	},
+
+	// A set of name-value pairs that sets or overrides environment variables for the container.
+	"containerEnv": {
+		"MONGOC_INSTALL_DIR": "/opt/drivers/mongo-c",
+		"JSONC_INSTALL_DIR": "/opt/drivers/json-c",
+		"PKG_CONFIG_PATH": "/workspaces/mongo_fdw/mongo-c-driver/src/libmongoc/src:/workspaces/mongo_fdw/mongo-c-driver/src/libbson/src"
+	},
+
+	// Use 'forwardPorts' to make a list of ports inside the container available locally.
+	// "forwardPorts": [],
+
+	// Use 'postCreateCommand' to run commands after the container is created.
+	"postCreateCommand": "./autogen.sh --with-master",
+
+	// A command to run each time the container is successfully started.
+	"postStartCommand": "make && sudo make install && sudo ldconfig && sudo su - postgres -c 'pg_ctlcluster 13 main start'",
+
+	// Comment out to connect as root instead. More info: https://aka.ms/vscode-remote/containers/non-root.
+	"remoteUser": "vscode"
+}
