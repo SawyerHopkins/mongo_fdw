@@ -4,8 +4,7 @@
             "name": "Linux",
             "includePath": [
                 "${workspaceFolder}/**",
-                "/usr/include/postgresql/13/server",
-                "/usr/include/postgresql/14/server"
+                "/usr/local/pgsql/include/server"
             ],
             "defines": [
                 "META_DRIVER=1"
